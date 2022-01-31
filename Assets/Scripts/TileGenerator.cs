@@ -1,7 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-//This class is really bloated bc I've just been jamming, I have ideas of how to clean it up and section into new classes
+
+//This class is really bloated and messy bc I've just been jamming, I have ideas of how to clean it up and section into new classes
 public class TileGenerator : MonoBehaviour {
 
 //Definitions for the grid fabrication
@@ -16,20 +17,21 @@ public class TileGenerator : MonoBehaviour {
     [Range(0,1)]
     public float spawnPercentGreen;
     [Range(0,1)]
-    public float spawnPercentBrown;
+    public float spawnPercentBlue;
 	[Range(0,1)]
     public float goalPercentRed;
     [Range(0,1)]
     public float goalPercentGreen;
     [Range(0,1)]
-    public float goalPercentBrown;
+    public float goalPercentBlue;
     //
     public List<HexSpace> hexGridContents = new List<HexSpace>();  //Stored list of all tiles in grid; HexSpaces
 
     public delegate void OnGridChange(float r, float g, float b);
-	public event OnGridChange GridGeneratedCallback;
+    public event OnGridChange GridCalculatedCallback;
 	public event OnGridChange TotalsChangeCallback;
 
+    //Picked this up a while ago, use it liberally but would like to be more
     public static TileGenerator instance;
     void Awake() {
     	if (instance != null) {
@@ -38,8 +40,11 @@ public class TileGenerator : MonoBehaviour {
     	}
     	instance = this;
     }
-//
+    //
+    Announcements barks;
     public void Start() {
+        barks = Announcements.instance;
+
         StartCoroutine(GenerateHexGrid(gridDim.x, gridDim.y));
     }
 
@@ -50,17 +55,16 @@ public class TileGenerator : MonoBehaviour {
         float zOffset = tileHeight * 0.75f; //Height multiplied by 3/4 -- height array ratio of hex grids
         Vector3 gridCenter = new Vector3(-(gridWidth * tileSize) / 2 + tileSize, 0, - (gridHeight * tileHeight) / 2 + tileHeight); //Used to offset spawnPos, centers grid to scene origin
         Vector3 spawnPos = Vector3.zero; //Defualt zeroed definition
-        int tileCount = 0; //Tile index
 
-        int[] tilePools = DistributeTilesToPools(spawnPercentRed, spawnPercentGreen, spawnPercentBrown, gridWidth, gridHeight);
-        GridGeneratedCallback?.Invoke(goalPercentRed, goalPercentGreen, goalPercentBrown);
+        int[] tilePools = DistributeTilesToPools(spawnPercentRed, spawnPercentGreen, spawnPercentBlue, gridWidth, gridHeight); //Setup for procgen
+        GridCalculatedCallback?.Invoke(goalPercentRed, goalPercentGreen, goalPercentBlue); //Event for UI class TotalsDisplay
     //
     //Core loop, cycles through dimensions defined in inspector (level editor class)
         for (int x = 0; x <= gridWidth - 1; x++) {               
             for (int z = 0; z <= gridHeight - 1; z++) {
                 bool skipPos = false; //Defined to reference valid spawn positions
 
-            //Placeholder procgen of tile type
+            //Placeholder procgen of tile type -- hardly works w/ even distribution
                 HexSpace.HexTile newTileType = ProcGenDistrubtion(tilePools);
             //
             //Checking and defining valid spawn positions             
@@ -77,25 +81,26 @@ public class TileGenerator : MonoBehaviour {
                     GameObject newTile = GameObject.Instantiate(prefabs[0], spawnPos, Quaternion.identity, this.transform);                    
                     newTile.AddComponent<HexSpace>();              
                     HexSpace newHexSpace = newTile.GetComponent<HexSpace>();    
-
+                    //Gosh I love the bottleneck of storing data, it all comes together here
                     UpdateHexSpace(newHexSpace, newTileType, colors[(int)newTileType], new Vector2(x,z), spawnPos, newTile, false);
 
                     hexGridContents.Add(newHexSpace);
                     newHexSpace.GetComponent<TileFlip>().FlipCallback += FlipHexSpace;
                     newHexSpace.GetComponent<TileFlip>().OriginCallback += FlipAdjacent;
 
-                    newTile.name = newTileType.ToString() + "Tile(" + tileCount + ")";
-                    tileCount++;
+                    newTile.name = newTileType.ToString() + "Tile(" + x + ", " + z + ")";
 
                     UpdateHexGridTotals();
 
-                    yield return new WaitForSeconds((1 + (gridWidth*gridHeight)/85) /(gridWidth*gridHeight));                  
+                    yield return new WaitForSeconds((1 + (gridWidth * gridHeight) / 85) / (gridWidth * gridHeight)); // fun hardcoded time calculation -- dependent on grid size                
                 }
             //
             }
         //
         }
-        yield return new WaitForSeconds(2);
+        //Call announcements and unlock tiles so the game begins!
+        StartCoroutine(barks.Bark(0));
+        yield return new WaitForSeconds(1);       
         LockHexGrid(false);
     }
 //Utility function, selects tiles randomly between defined pools
@@ -120,26 +125,26 @@ public class TileGenerator : MonoBehaviour {
 
         switch(tileIndex) {
             default:
-            return HexSpace.HexTile.Brown;
+            return HexSpace.HexTile.Blue;
             case 0:
             return HexSpace.HexTile.Red;
             case 1:
             return HexSpace.HexTile.Green;
             case 2:
-            return HexSpace.HexTile.Brown;
+            return HexSpace.HexTile.Blue;
         }
     }
 //Setup for procgen, distributes total tiles to percentages of each color and random
 //This function breaks if the inspector fields are filled greater than 100% distribution, is there a way to restrict the float variables so they don't exceed 1 when combined?
-    static int[] DistributeTilesToPools(float redP, float greenP, float brownP, float gridWidth, float gridHeight) {
+    static int[] DistributeTilesToPools(float redP, float greenP, float BlueP, float gridWidth, float gridHeight) {
         int totalTiles = (int)((gridWidth * gridHeight) - gridHeight / 2);
         int[] pools = new int[4];
 
         pools[0] = (int)(totalTiles * redP);
         pools[1] = (int)(totalTiles * greenP);
-        pools[2] = (int)(totalTiles * brownP);
+        pools[2] = (int)(totalTiles * BlueP);
         pools[3] = totalTiles - pools[0] - pools[1] - pools[2];
-        //Debug.Log(totalTiles + " TotalTiles, " + pools[0] + " RedTiles, " + pools[1] + " GreenTiles, " + pools[2] + " BrownTiles, " + pools[3] + " RandomTiles");
+        //Debug.Log(totalTiles + " TotalTiles, " + pools[0] + " RedTiles, " + pools[1] + " GreenTiles, " + pools[2] + " BlueTiles, " + pools[3] + " RandomTiles");
         return pools;
     }
 //
@@ -150,7 +155,9 @@ public class TileGenerator : MonoBehaviour {
 
     	space.hexObject.GetComponent<Renderer>().material = colors[index];
     	space.hexTile = (HexSpace.HexTile)index;
-    	UpdateHexGridTotals();
+        space.hexObject.name = space.hexTile.ToString() + "Tile(" + space.coordinate.x + ", " + space.coordinate.y + ")";
+
+        UpdateHexGridTotals();
     }
 //
 //Function is executed through delegate event from the TileFlip class
@@ -175,11 +182,12 @@ public class TileGenerator : MonoBehaviour {
 	    	new Vector2(originCoord.x+1, originCoord.y)};
     	}
     	foreach(Vector2 coord in adjacentCoord) {
-    		if(hexGridContents.Find(space => space.coordinate == coord) != null) {
-    			HexSpace adjSpace = hexGridContents.Find(space => space.coordinate == coord); //Found this constructor thru microsoft docs, have never used it before   		
+    		if(hexGridContents.Find(space => space.coordinate == coord) != null) { //Found this constructor thru microsoft docs, have never used it before
+    			HexSpace adjSpace = hexGridContents.Find(space => space.coordinate == coord);    		
     			StartCoroutine(adjSpace.GetComponent<TileFlip>().FlipTile(false));
     		}
     	}
+
     }
 //
 //Utility function, updates all fields of the utility class HexSpace
@@ -204,17 +212,16 @@ public class TileGenerator : MonoBehaviour {
     		}
     	}
     }
-
+//Temporarily store grid totals, call for UI to refresh after tiles flip
     void UpdateHexGridTotals() {
-    	int totalTiles = (int)(gridDim.x * gridDim.y) - (int)(gridDim.y/2);
-    	int amntRed = 0, amntGreen = 0, amntBrown = 0;
+    	int amntRed = 0, amntGreen = 0, amntBlue = 0;
     	foreach (HexSpace space in hexGridContents) {
     		if ((int)space.hexTile == 0) amntRed++;
     		else if ((int)space.hexTile == 1) amntGreen++;
-    		else if ((int)space.hexTile == 2) amntBrown++;
+    		else if ((int)space.hexTile == 2) amntBlue++;
     	}
 
-    	TotalsChangeCallback?.Invoke(amntRed, amntGreen, amntBrown);
+    	TotalsChangeCallback?.Invoke(amntRed, amntGreen, amntBlue);
     }
 }
 
@@ -222,7 +229,7 @@ public class TileGenerator : MonoBehaviour {
 [System.Serializable]
 public class HexSpace : MonoBehaviour {
 
-    public enum HexTile { Red, Green, Brown };
+    public enum HexTile { Red, Green, Blue };
     public HexTile hexTile;
     public Vector2 coordinate;
     public Vector3 position;
