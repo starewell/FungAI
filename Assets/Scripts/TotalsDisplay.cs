@@ -15,15 +15,25 @@ public class TotalsDisplay : MonoBehaviour {
 	int[] values = new int[3];
 	int[] goals = new int[3];
 
-	public Announcements barks;
+	public delegate void OnEndCondition();
+	public event OnEndCondition OnWinCallback;
+	public event OnEndCondition OnLoseCallback;
+
+	public static TotalsDisplay instance;
+	void Awake() { 
+		if (instance != null) { 
+			Debug.Log("More than one instance of TotalsDisplay found!");
+    		return;
+    	}
+    	instance = this;
+	}
+
 //
 	void Start() {
 		//Grab instance ref for event callbacks to update UI from TileGenerator
 		tileGen = TileGenerator.instance;
 		tileGen.GridCalculatedCallback += UpdateGoals;
 		tileGen.TotalsChangeCallback += UpdateTotals;
-
-		barks = Announcements.instance;
 	}
 //Update the totals required to win in the UI when grid is calculated
 	void UpdateGoals(float r, float g, float b) {
@@ -42,7 +52,7 @@ public class TotalsDisplay : MonoBehaviour {
 		values[2] = (int)b;
 
 		UpdateDisplay();
-		if (values[0] >= goals[0] && values[1] >= goals[1] && values[2] >= goals[2]) StartCoroutine(barks.Bark(1));
+		if (values[0] >= goals[0] && values[1] >= goals[1] && values[2] >= goals[2]) OnWinCallback?.Invoke();
 	}
 //
 //Update all fields of the UI elements which display win conditions

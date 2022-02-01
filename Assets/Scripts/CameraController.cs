@@ -4,7 +4,9 @@ using UnityEngine;
 
 //Simple class for raycasting clicks onto the hex grid's colliders
 public class CameraController : MonoBehaviour {
- 
+
+	public GameObject focus;
+
 	Camera cam;
 	public LayerMask interactionMask;
 
@@ -16,6 +18,10 @@ public class CameraController : MonoBehaviour {
 			}
 		}
 	}
+
+	void FixedUpdate() {
+		
+    }
 
 	void Update() {
 	//Check for clicks, raycast, execute Interacable class function

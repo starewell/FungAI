@@ -6,16 +6,32 @@ using UnityEngine.UI;
 //Really just throwing things together here tbh
 public class Announcements : MonoBehaviour {
 
-    public GameObject[] barkPanels; //BarkPanel prefab, different announcments
+    TileGenerator tileGen;
+    TotalsDisplay totals;
 
-    public static Announcements instance; //This class's function will be called from many other classes
-    void Awake() {
-        if (instance != null)
-        {
-            Debug.Log("More than one instance of Announcements found!");
-            return;
+    public GameObject[] barkPanels; //BarkPanel prefabs, different announcments
+
+    void Start() {
+        tileGen = TileGenerator.instance;
+        tileGen.GridGeneratedCallback += OnGridGenerated;
+        totals = TotalsDisplay.instance;
+        totals.OnWinCallback += OnWin;
+        //totals.OnLoseCallback += OnLose;
+        foreach (GameObject go in barkPanels) {
+            go.SetActive(true);
         }
-        instance = this;
+    }
+
+    void OnGridGenerated(float r, float g, float b) {//Passing these parameters just to avoid making a new event :\
+        StartCoroutine(Bark(0));    
+    }
+
+    void OnWin() {
+        StartCoroutine(Bark(1));
+    }
+
+    void OnLose() {
+        StartCoroutine(Bark(2));
     }
     
     //play bark animation at index

@@ -29,9 +29,10 @@ public class TileGenerator : MonoBehaviour {
 
     public delegate void OnGridChange(float r, float g, float b);
     public event OnGridChange GridCalculatedCallback;
-	public event OnGridChange TotalsChangeCallback;
+    public event OnGridChange GridGeneratedCallback;
+    public event OnGridChange TotalsChangeCallback;
 
-    //Picked this up a while ago, use it liberally but would like to be more
+    //My singleton which does not completely remove human error, but is it egregious? 
     public static TileGenerator instance;
     void Awake() {
     	if (instance != null) {
@@ -41,15 +42,13 @@ public class TileGenerator : MonoBehaviour {
     	instance = this;
     }
     //
-    Announcements barks;
     public void Start() {
-        barks = Announcements.instance;
-
-        StartCoroutine(GenerateHexGrid(gridDim.x, gridDim.y));
+        StartCoroutine(GenerateHexGrid(gridDim.x, gridDim.y, 1.5f));
     }
 
 //Primary function of class, create a grid of hexes and store their important data in a centralized list     
-    IEnumerator GenerateHexGrid(float gridWidth, float gridHeight) {
+    IEnumerator GenerateHexGrid(float gridWidth, float gridHeight, float delay) {
+        yield return new WaitForSeconds(delay);
     //Defining local variables used in function
         float tileHeight = tileSize * 1.1547f; //Width multiplied by ratio of hex width to height
         float zOffset = tileHeight * 0.75f; //Height multiplied by 3/4 -- height array ratio of hex grids
@@ -98,9 +97,9 @@ public class TileGenerator : MonoBehaviour {
             }
         //
         }
-        //Call announcements and unlock tiles so the game begins!
-        StartCoroutine(barks.Bark(0));
-        yield return new WaitForSeconds(1);       
+        //Signal grid is done generating and unlock tiles
+        GridGeneratedCallback?.Invoke(0, 0, 0);
+        yield return new WaitForSeconds(delay*2);       
         LockHexGrid(false);
     }
 //Utility function, selects tiles randomly between defined pools
@@ -151,7 +150,7 @@ public class TileGenerator : MonoBehaviour {
 //Function is executed through delegate event from the TileFlip class
     void FlipHexSpace(HexSpace space) {
     	int index = (int)space.hexTile + 1;
-    	if (index > colors.Length - 1) index = 0;
+    	if (index > System.Enum.GetValues(typeof(HexSpace.HexTile)).Length - 1) index = 0;
 
     	space.hexObject.GetComponent<Renderer>().material = colors[index];
     	space.hexTile = (HexSpace.HexTile)index;
@@ -225,15 +224,3 @@ public class TileGenerator : MonoBehaviour {
     }
 }
 
-//Utility class, stores all important information of individual tiles in the grid
-[System.Serializable]
-public class HexSpace : MonoBehaviour {
-
-    public enum HexTile { Red, Green, Blue };
-    public HexTile hexTile;
-    public Vector2 coordinate;
-    public Vector3 position;
-    public GameObject hexObject;
-    public bool interactable;
-    //public Item storedItem;
-}
